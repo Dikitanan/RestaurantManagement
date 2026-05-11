@@ -5,10 +5,10 @@ RUN apt-get update && apt-get install -y \
     git \
     curl \
     unzip \
+    zip \
     libpq-dev \
     libonig-dev \
     libzip-dev \
-    zip \
     && docker-php-ext-install pdo pdo_mysql mbstring zip
 
 # Install Composer
@@ -17,23 +17,17 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www
 
-# Copy composer files first
-COPY composer.json composer.lock ./
-
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-scripts
-
-# Copy application files
+# Copy all files
 COPY . .
 
-# Set Laravel permissions
+# Install PHP dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Fix permissions
 RUN chown -R www-data:www-data storage bootstrap/cache
 
-# Clear Laravel caches
-RUN php artisan config:clear && \
-    php artisan route:clear && \
-    php artisan view:clear
+# Render needs an HTTP port (NOT PHP-FPM port)
+EXPOSE 8080
 
-EXPOSE 9000
-
-CMD ["php-fpm"]
+# Start Laravel as HTTP server (IMPORTANT FIX)
+CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
